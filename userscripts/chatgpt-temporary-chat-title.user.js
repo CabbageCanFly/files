@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Temporary Chat Title
 // @namespace    local
-// @version      1.3
+// @version      1.4
 // @description  Labels temporary chats and warns before leaving them
 // @match        https://chatgpt.com/*
 // @run-at       document-start
@@ -12,7 +12,7 @@
     'use strict';
 
     const temporaryTitle = 'Temporary Chat';
-    const normalNewChatTitle = 'ChatGPT';
+    const normalTitle = 'ChatGPT';
 
     // Prevent multiple confirmation dialogs from the same navigation.
     let navigationApprovedUntil = 0;
@@ -25,16 +25,8 @@
         return isTemporaryURL(new URL(window.location.href));
     }
 
-    function isNormalNewChat() {
-        const url = new URL(window.location.href);
-
-        return (
-            url.pathname === '/' &&
-            !isTemporaryURL(url)
-        );
-    }
-
     function updateTitle() {
+        // While in a temporary chat, always force the temporary title.
         if (isTemporaryChat()) {
             if (document.title !== temporaryTitle) {
                 document.title = temporaryTitle;
@@ -42,15 +34,11 @@
             return;
         }
 
-        if (isNormalNewChat()) {
-            if (document.title !== normalNewChatTitle) {
-                document.title = normalNewChatTitle;
-            }
-            return;
+        // The moment ?temporary-chat=true disappears, clear any stale
+        // Temporary Chat title. After that, let ChatGPT manage the title.
+        if (document.title === temporaryTitle) {
+            document.title = normalTitle;
         }
-
-        // Existing normal chats:
-        // let ChatGPT manage its own title.
     }
 
     function destinationLeavesTemporaryChat(destination) {
@@ -189,8 +177,8 @@
     // ------------------------------------------------------------
     // MODERN BROWSER NAVIGATION
     //
-    // This also helps cover things such as browser back/forward and
-    // same-document navigation in Chromium-based browsers.
+    // Helps cover browser back/forward and newer SPA navigation
+    // behavior in Chromium-based browsers.
     // ------------------------------------------------------------
 
     if ('navigation' in window) {
@@ -211,6 +199,10 @@
                 event.preventDefault();
             }
         });
+
+        // Once navigation succeeds, immediately clear a stale
+        // Temporary Chat title if the URL is no longer temporary.
+        window.navigation.addEventListener('navigatesuccess', updateTitle);
     }
 
 
@@ -234,5 +226,6 @@
     });
 
 
+    // Browser back/forward fallback.
     window.addEventListener('popstate', updateTitle);
 })();
