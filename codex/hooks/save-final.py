@@ -1,4 +1,3 @@
-
 """Codex Stop hook: atomically save the latest assistant response."""
 
 import json
@@ -25,7 +24,7 @@ def log(message):
 
 def main():
     log("INVOKED")
-    event = json.load(sys.stdin)
+    event = json.loads(sys.stdin.buffer.read().decode("utf-8"))
 
     message = event.get("last_assistant_message")
     cwd = event.get("cwd")
