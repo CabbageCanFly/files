@@ -632,7 +632,7 @@ function Send-ChannelDeliveryLocal {
                 try { $codexData = $HookData | ConvertFrom-Json -ErrorAction Stop } catch { }
                 $kind = [string]$codexData.codex_notify.kind
                 $now = [DateTimeOffset]::Now.ToString('yyyy-MM-dd HH:mm:ss zzz')
-                $text = "⋄ ────────────────────────────────"
+                $text = "⋄ ──────────────────────────"
                 if ($kind -eq 'possible_question') {
                     $text += "`n**Codex may need your reply**`n**Project:** ``$ProjectName```n**Time:** ``$now``"
                 } elseif ($HookType -eq 'stop') {
@@ -717,7 +717,7 @@ function Send-ChannelDeliveryLocal {
                 }
 
             }
-            $text += "`n⋄ ────────────────────────────────"
+            $text += "`n⋄ ──────────────────────────"
 
             if ($channel.provider -eq "discord") {
                 # Codex's final answer stays in its own Markdown-capable embed;
