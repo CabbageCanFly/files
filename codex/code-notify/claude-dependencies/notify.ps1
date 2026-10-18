@@ -306,6 +306,20 @@ if ($ToolName -eq "codex" -and $HookType -eq "stop") {
         }
     }
 }
+# Claude Code events arrive with a session ID (and usually no per-turn ID).
+# Use a per-session key, rather than suppressing another project globally.
+if ($ToolName -eq 'claude' -and $HookType -eq 'stop') {
+    $claudeSession = Get-JsonStringValue -Json $HookData -Key 'session_id'
+    $claudeTurn = Get-JsonStringValue -Json $HookData -Key 'claude_turn_id'
+    if ($claudeSession -match '^[A-Za-z0-9_-]{6,100}$' -and $claudeTurn -match '^[A-Za-z0-9_-]{6,100}$') {
+        $StopRateLimitKey = "last_stop_claude_${claudeSession}_${claudeTurn}"
+    } elseif ($claudeSession -match '^[A-Za-z0-9_-]{6,100}$') {
+        $StopRateLimitKey = "last_stop_claude_${claudeSession}"
+    } else {
+        $StopRateLimitKey = "last_stop_claude_$ProjectName"
+    }
+    $StopRateLimitSeconds = 4
+}
 # Function to check if notification should be suppressed
 function Test-ShouldSuppressNotification {
     # Skip suppression checks for test notifications
@@ -320,7 +334,7 @@ function Test-ShouldSuppressNotification {
     if ($HookType -eq "notification") {
         $notificationKey = "last_notification_{0}_{1}_{2}" -f $ToolName, (Get-ProjectNameForNotification), (Get-NotificationSubtype)
         $window = $NotificationRateLimitSeconds
-        if ($ToolName -eq 'codex' -and $HookData -match 'codex-input-question') { $window = 4 }
+        if (($ToolName -eq 'codex' -and $HookData -match 'codex-input-question') -or ($ToolName -eq 'claude' -and $HookData -match 'possible_question')) { $window = 4 }
         if (Test-RateLimited -Key $notificationKey -WindowSeconds $window) {
             return $true
         }
@@ -622,23 +636,25 @@ function Send-ChannelDeliveryLocal {
             $text = $Title
             if ($Message) { $text = "$text`n$Message" }
             if ($ProjectName) { $text = "$text`nProject: $ProjectName" }
-            # CODE-NOTIFY COMPACT CODEX CHANNEL MESSAGE V0.5
-            # Codex metrics are formatted here; the final answer (when enabled)
-            # is delivered separately as a Discord Markdown embed below.
-            if ($ToolName -eq 'codex' -and ($HookType -eq 'stop' -or $HookType -eq 'notification')) {
-                # Optional telemetry and final assistant text arrive on stdin
-                # from the Codex Stop adapter. Do not send entire transcripts.
-                $codexData = $null
-                try { $codexData = $HookData | ConvertFrom-Json -ErrorAction Stop } catch { }
-                $kind = [string]$codexData.codex_notify.kind
+            # CODE-NOTIFY COMPACT AGENT CHANNEL MESSAGE V0.6
+            # Format the same metrics for Codex and Claude Code.
+            # The optional final-reply embed remains disabled below.
+            if ($ToolName -in @('codex', 'claude') -and ($HookType -eq 'stop' -or $HookType -eq 'notification')) {
+                # Structured telemetry arrives from the corresponding agent adapter.
+                $agentData = $null
+                try { $agentData = $HookData | ConvertFrom-Json -ErrorAction Stop } catch { }
+                $agentInfo = if ($ToolName -eq 'codex') { $agentData.codex_notify } else { $agentData.claude_notify }
+                $kind = [string]$agentInfo.kind
                 $now = [DateTimeOffset]::Now.ToString('yyyy-MM-dd HH:mm:ss zzz')
                 $text = "⋄ ──────────────────────────"
                 if ($kind -eq 'possible_question') {
-                    $text += "`n**Codex may need your reply**`n**Project:** ``$ProjectName```n**Time:** ``$now``"
+                    $text += "`n**$ToolDisplay may need your reply**`n**Project:** ``$ProjectName```n**Time:** ``$now``"
+                } elseif ($HookType -eq 'notification') {
+                    $text += "`n**$ToolDisplay needs your input**`n**Project:** ``$ProjectName```n**Time:** ``$now``"
                 } elseif ($HookType -eq 'stop') {
-                    $text += "`n**Codex task completed**`n**Project:** ``$ProjectName```n**Time:** ``$now``"
+                    $text += "`n**$ToolDisplay task completed**`n**Project:** ``$ProjectName```n**Time:** ``$now``"
                 }
-                $stats = $codexData.codex_notify.metrics
+                $stats = $agentInfo.metrics
                 $details = @()
                 if ($null -ne $stats) {
                     if ($null -ne $stats.duration_seconds) {
@@ -712,7 +728,7 @@ function Send-ChannelDeliveryLocal {
                 }
                 if ($details.Count -gt 0) {
                     $text += "`n" + ($details -join "`n")
-                } else {
+                } elseif ($HookType -eq 'stop') {
                     $text += "`nUsage details not available for this turn"
                 }
 
@@ -749,7 +765,7 @@ function Send-ChannelDeliveryLocal {
             Invoke-RestMethod -Uri $channel.url -Method Post -Body $payloadBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 5 | Out-Null
         } catch {
             # Do not include webhook URLs or message text in diagnostic logs.
-            if ($ToolName -eq 'codex') {
+            if ($ToolName -in @('codex', 'claude')) {
                 try {
                     $deliveryLog = Join-Path $CodeNotifyConfigDir 'delivery-errors.log'
                     $errorKind = $_.Exception.GetType().Name

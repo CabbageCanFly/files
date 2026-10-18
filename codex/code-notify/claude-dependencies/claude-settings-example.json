@@ -1,0 +1,33 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["C:/Users/James/.claude/notifications/claude-notify.js", "--hook"],
+            "timeout": 25
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|idle_prompt|agent_needs_input|elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["C:/Users/James/.claude/notifications/claude-notify.js", "--hook"],
+            "timeout": 25
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node \"C:/Users/James/.claude/notifications/claude-notify.js\" --statusline"
+  }
+}
