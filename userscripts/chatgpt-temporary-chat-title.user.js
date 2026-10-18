@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT Temporary Chat Title
 // @namespace    local
-// @version      1.4
-// @description  Labels temporary chats and warns before leaving them
+// @version      1.5
+// @description  Labels temporary chats, warns before leaving, and removes ChatGPT UTM tags from outgoing links
 // @match        https://chatgpt.com/*
 // @run-at       document-start
 // @grant        none
@@ -13,6 +13,70 @@
 
     const temporaryTitle = 'Temporary Chat';
     const normalTitle = 'ChatGPT';
+
+    // Remove ONLY utm_source=chatgpt.com, keeping all other query
+    // parameters (including any other utm_source values) in place.
+    function cleanOutgoingURL(value) {
+        if (typeof value !== 'string' && !(value instanceof URL)) {
+            return value;
+        }
+
+        try {
+            const url = new URL(String(value), window.location.href);
+            if (
+                !['http:', 'https:'].includes(url.protocol) ||
+                !url.searchParams.getAll('utm_source').includes('chatgpt.com')
+            ) {
+                return value;
+            }
+
+            url.searchParams.delete('utm_source', 'chatgpt.com');
+            return url.href;
+        } catch {
+            return value;
+        }
+    }
+
+    function cleanClickedLink(event) {
+        if (event.type === 'keydown' && event.key !== 'Enter') {
+            return;
+        }
+
+        const target = event.target instanceof Element
+            ? event.target
+            : event.target?.parentElement;
+        const link = target?.closest('a[href]');
+
+        if (!link || link.hasAttribute('download')) {
+            return;
+        }
+
+        const cleaned = cleanOutgoingURL(link.href);
+        if (cleaned !== link.href) {
+            // Change the link in place. The browser can then handle
+            // ordinary, Ctrl/Cmd, middle, and target=_blank clicks.
+            link.href = cleaned;
+        }
+    }
+
+    // Capturing on window runs before most page click handlers.
+    // Hover/focus also covers right-click menus and keyboard navigation.
+    for (const type of [
+        'pointerover', 'focusin', 'pointerdown', 'mousedown',
+        'click', 'auxclick', 'contextmenu', 'keydown'
+    ]) {
+        window.addEventListener(type, cleanClickedLink, true);
+    }
+
+    // Some ChatGPT links may be opened via JavaScript instead of a
+    // regular anchor click. This works when injected in page context.
+    const originalOpen = window.open;
+    window.open = function (...args) {
+        if (args.length > 0) {
+            args[0] = cleanOutgoingURL(args[0]);
+        }
+        return Reflect.apply(originalOpen, this, args);
+    };
 
     // Prevent multiple confirmation dialogs from the same navigation.
     let navigationApprovedUntil = 0;
