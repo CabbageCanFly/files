@@ -632,7 +632,7 @@ function Send-ChannelDeliveryLocal {
                 try { $codexData = $HookData | ConvertFrom-Json -ErrorAction Stop } catch { }
                 $kind = [string]$codexData.codex_notify.kind
                 $now = [DateTimeOffset]::Now.ToString('yyyy-MM-dd HH:mm:ss zzz')
-                $text = "⋄ ─────────────────────"
+                $text = "⋄ ────────────────────────────────"
                 if ($kind -eq 'possible_question') {
                     $text += "`n**Codex may need your reply**`n**Project:** ``$ProjectName```n**Time:** ``$now``"
                 } elseif ($HookType -eq 'stop') {
@@ -674,7 +674,7 @@ function Send-ChannelDeliveryLocal {
                         if ($null -eq $limits -or $null -eq $limits.$field) { continue }
                         $windowMins = if ($null -ne $windows) { $windows.$field } else { $null }
                         $label = if ($null -ne $windowMins -and [int]$windowMins -eq 300) { '5-hour limit' } elseif ($null -ne $windowMins -and [int]$windowMins -eq 10080) { 'Weekly limit' } else { "$field limit" }
-                        $details += ("`n" + ('**{0}:** `{1:N1}% used`' -f $label, [double]$limits.$field))
+                        $details += ("`n" + ('**{0}:** `{1:N1}% left`' -f $label, (100.0 - [double]$limits.$field)))
                         # Display the server-reported absolute reset instant in the
                         # machine's local timezone; countdown is as of send time.
                         # Do not guess a reset if Codex omitted resets_at.
@@ -717,7 +717,7 @@ function Send-ChannelDeliveryLocal {
                 }
 
             }
-            $text += "`n⋄ ─────────────────────"
+            $text += "`n⋄ ────────────────────────────────"
 
             if ($channel.provider -eq "discord") {
                 # Codex's final answer stays in its own Markdown-capable embed;
