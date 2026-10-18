@@ -1,0 +1,25 @@
+{
+    "hooks":  {
+      "Stop":  [
+       {
+           "hooks":  [
+             {
+                 "type":  "command",
+                 "command":  "C:/Users/James/AppData/Local/Programs/Python/Python314/python.exe C:/Users/James/.codex/hooks/save-final.py",
+                 "timeout":  10
+             },
+             {
+                 "type":  "command",
+                 "command":  "C:/Users/James/AppData/Local/Programs/Python/Python314/python.exe C:/Users/James/.codex/hooks/notify-toast.py",
+                 "timeout":  10
+             },
+             {
+                 "type":  "command",
+                 "command":  "node C:/Users/James/.codex/hooks/code-notify-stop.js",
+                 "timeout":  25
+             }
+         ]
+       }
+   ]
+  }
+}
