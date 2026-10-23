@@ -183,6 +183,7 @@ function deliver(e, opts = {}) {
   }
   const payload = {
     session_id:e.session_id, claude_turn_id:turnId, cwd:e.cwd,
+    transcript_path:e.transcript_path,
     hook_event_name:hook, notification_type:e.notification_type || null,
     claude_notify:{kind:hook === 'Stop' && isQuestion ? 'possible_question' : isQuestion ? 'input_required' : 'complete', metrics}
   };

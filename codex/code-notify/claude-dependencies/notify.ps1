@@ -644,6 +644,17 @@ function Send-ChannelDeliveryLocal {
                 $agentData = $null
                 try { $agentData = $HookData | ConvertFrom-Json -ErrorAction Stop } catch { }
                 $agentInfo = if ($ToolName -eq 'codex') { $agentData.codex_notify } else { $agentData.claude_notify }
+                $sessionTitle = ''
+                $sessionId = if ($ToolName -eq 'codex') { [string]$agentData.'thread-id' } else { [string]$agentData.session_id }
+                $sessionTranscript = if ($ToolName -eq 'claude') { [string]$agentData.transcript_path } else { '' }
+                $resolver = Join-Path $CodeNotifyConfigDir 'session_title.py'
+                $python = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python314\python.exe'
+
+                if ($sessionId -and (Test-Path $resolver) -and (Test-Path $python)) {
+                    try {
+                        $sessionTitle = (& $python $resolver $ToolName $sessionId $sessionTranscript 2>$null | Select-Object -First 1)
+                    } catch { }
+                }
                 $kind = [string]$agentInfo.kind
                 $now = [DateTimeOffset]::Now.ToString('yyyy-MM-dd HH:mm:ss zzz')
                 $text = "⋄ ──────────────────────────"
@@ -726,6 +737,7 @@ function Send-ChannelDeliveryLocal {
                         $details += ('**Reply excerpt:** {0}' -f [string]$stats.reply_excerpt)
                     }
                 }
+                if ($sessionTitle) { $text += "`n**Thread:** $sessionTitle" }
                 if ($details.Count -gt 0) {
                     $text += "`n" + ($details -join "`n")
                 } elseif ($HookType -eq 'stop') {
